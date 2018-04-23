@@ -1,0 +1,58 @@
+These two scripts automate the secure erase of hard drives to varying degrees from a Parted Magic live USB or CD. One is interactive - tuxnukem.sh, and one full automated - fastnukem.sh - the only user interaction required in waking the computer from suspend if an ssd is installed.
+
+Quick Overview of How to Use Once Parted Magic USB has been setup and script installed:
+
+- Shutdown computer
+- Boot from Parted Magic USB
+- If interactive answer yes or no to questions. q to quit.
+- If non-interactive, do nothing but wait for script to complete and
+  machine to shut itself down.
+  - Unless an SSD is installed in which case you will need to wait for
+    the machine to suspend and then wake it up for the script to complete. Explained in greater detail below...
+- DO NOT POWER OFF OR KILL THE SCRIPT WHILST THE SSD ERASE IS TAKING
+  PLACE AS THIS CAN BRICK THE SSD. ENSURE YOU ARE CONNECTED TO AC, ETC.
+
+How to setup Parted Magic USB:
+
+- Download Parted Magic from https://partedmagic.com/ or grab the ISO
+  from ukit02/f/sys/pmagic
+- Write the iso to a usb using Rufus (https://rufus.akeo.ie/) or Yumi
+  (https://www.pendrivelinux.com/yumi-multiboot-usb-creator/) on Windows. Etcher or the dd command on macOS.
+
+  dd if=/path/to/pmagic.iso of=/dev/disk{$drive_number} bs=4m; sync
+
+- Mount the USB drive and copy either tuxnukem.sh or fastnukem.sh to
+  /pmagic/pmodules/scripts/
+
+Detailed Explanation:
+
+The script finds any disks in the machine that are internal by probing the TRANS (transfer type) field of lsblk's output parameter and looking for SATA interfaces. That way we don't pick up the USB drive itself.
+
+We interate over each SATA devices (so the script scales to multi-drive machines) and ask or automate (depending on script used) the following tasks:
+
+- Wipe thepartition table with sgdisk --zap-all. This command looks
+  for any gpt or mbr partition tables and destroys any of these data structures.
+- Use dd to zero out the first and last MB of the drive. I do this
+  just to be doubley sure any partition table structures have been nuked from orbit!
+- Use dcfldd (an extended dd) to write random data (using the
+  /dev/urandom device file) to the first 2GB of the drive.
+  - The interactive script provides the option to wipe the whole drive
+    in this manner if you're feeling particularly paranoid. It's recommended that this is done multiple times to make a the data on a traditional spinning hard drive truly unrecoverable, however, this is probably impractical (likely to take multiple hours) and overkill for our usage.
+- Detect an SSD using the kernel's block info at
+  /sys/block/disk/queue/rotational
+- If we find an SSD use hdparm to clear it's memory cells by setting
+  an clearing a password to reset the encryption key and effectively reset all the cells to their factory state.
+- We need to suspend the machine before this operation can be carried
+  out, because Many BIOSes will protect your drives if you have a password set (security enabled) by issuing a SECURITY FREEZE command before booting an operating system. The only way to unfreeze the drive is either to hotplug it or suspend the machine. I opted for the latter, since it's fairly tricky to hotplug a drive with a bash script!
+- Their are two types of memory cell clearing - secure and
+  enhanced. The difference between the two being that enhanced wipes the reserved blocks too, but it's not always supported with every ssd model, so I check for support and only run it if it's supported. It's worth noting that the enhanced erase tends to take a fair bit longer. Before running the command I parse the output of hdparm's informational argument to get a time estimate.
+- IT'S INCREDIBLY IMPORTANT THAT THE MACHINE IS NOT POWERED OFF OR THE
+  HDPARM PROCESS TERMINATED OR YOU RISK BRICKING THE DRIVE.
+
+References:
+
+https://ata.wiki.kernel.org/index.php/ATA_Secure_Erase
+
+https://www.kingston.com/en/community/articledetail/articleid/10
+
+https://superuser.com/questions/1102184/how-can-i-securely-wipe-an-ssd/1102853
