@@ -7,7 +7,7 @@ NUKED=false;
 
 # logfile variable, may be better to send to tmp dir instead...
 
-LOGFILE=./disk_nukem-macos.log;
+LOG="/tmp/$(basename $0)-$(date '+%Y-%m-%d').log"
 
 # choose which kind of disk we should look for, can be set to external.
 
@@ -15,17 +15,17 @@ DISKTYPE=internal;
 
 # create an array of disks of the type specified above.
 
-DISKARRAY=(`diskutil list $DISKTYPE | cut -f 1 -d " " | sed '/^$/d'`);
+DISKARRAY=$(diskutil list $DISKTYPE | cut -f 1 -d " " | sed '/^$/d');
 
 # function that creates a break in the logfile, so we can discern,
 # which log was for which execution.
 
 log_entry () {
-    echo "" >> $LOGFILE;
-    echo "DATE: "$(date "+%A %d %B %Y") >> $LOGFILE;
-    echo "TIME: "$(date "+%H:%M:%S") >> $LOGFILE;
-    echo "OUTPUT FROM DISK_NUKEM.SH EXECUTION:" >> $LOGFILE
-    echo "" >> $LOGFILE;
+    echo "" >> $LOG;
+    echo "DATE: "$(date "+%A %d %B %Y") >> $LOG;
+    echo "TIME: "$(date "+%H:%M:%S") >> $LOG;
+    echo "Output from $(basename $0) execution:" >> $LOG
+    echo "" >> $LOG;
 }
 
 # function to ask whether or not we really want to nuke the
@@ -76,8 +76,8 @@ for i in "${DISKARRAY[@]}"; do
 	    if ask $i; then
 		NUKED=true;
 		printf '\nNUKEING...(this may take a minute...)\n\n';
-		! $(diskutil apfs deleteContainer $i >> $LOGFILE) && ERROR=true;
-		! $(diskutil eraseDisk HFS+ "Macintosh HD" $container >> $LOGFILE) && ERROR=true;
+		! $(diskutil apfs deleteContainer $i >> $LOG) && ERROR=true;
+		! $(diskutil eraseDisk HFS+ "Macintosh HD" $container >> $LOG) && ERROR=true;
 	    else
 		NUKED=false;
 		printf '\nNOT NUKEING... Disk Nukem is :-(\n\n';
@@ -90,8 +90,8 @@ for i in "${DISKARRAY[@]}"; do
 	    if ask $i; then
 		NUKED=true;
 		printf '\nNUKEING...(this may take a minute...)\n\n';
-		! $(diskutil cs deleteVolume $i >> $LOGFILE) && ERROR=true;
-		! $(diskutil eraseDisk HFS+ "Macintosh HD" $csdisk >> $LOGFILE) && ERROR=true;
+		! $(diskutil cs deleteVolume $i >> $LOG) && ERROR=true;
+		! $(diskutil eraseDisk HFS+ "Macintosh HD" $csdisk >> $LOG) && ERROR=true;
 	    else
 		NUKED=false;
 		printf '\nNOT NUKEING... Disk Nukem is :-(\n\n';
