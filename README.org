@@ -90,3 +90,7 @@ https://www.kingston.com/en/community/articledetail/articleid/10
 https://superuser.com/questions/1102184/how-can-i-securely-wipe-an-ssd/1102853
 
 * MACNUKEM
+
+These macOS wiping script were written to get around the limitation of
+Deploy Studio not being able to image to APFS formatted disks or disks
+with FileVault enabled.
