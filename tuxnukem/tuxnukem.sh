@@ -224,13 +224,14 @@ ssderase () {
 	    sleep .1
 	done
 	printf '\r'; printf ' %0.s' {0..42} # 100 expansions of the space character to blank last line
-	echo "${NC}"
     fi
 
     wait $hdparm_pid
     if [ $? -eq 0 ]; then
+	echo
 	echo "${BOLD}${CYAN}Erase succeeded.${NC}"
     else
+	echo
 	echo "${BOLD}${RED}Erase failed.${NC}"
     fi
 }
