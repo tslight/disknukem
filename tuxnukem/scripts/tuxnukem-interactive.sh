@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
-bash $(dirname $0)/tuxnukem/tuxnukem.sh -i
+dir=$(dirname $0)
+parent=${dir%/*}
+bash "$parent"/tuxnukem.sh -i
