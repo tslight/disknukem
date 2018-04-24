@@ -216,20 +216,23 @@ ssderase () {
     if [ "$time" -gt 2 ]; then
 	spin='-\|/'
 	i=0
-	echo
+	echo "${BOLD}${YELLOW}"
 	while kill -0 $hdparm_pid 2>/dev/null
 	do
 	    i=$(( (i+1) %4 ))
-	    printf "${BOLD}${YELLOW}\rErasing SSD: ${spin:$i:1}"
+	    printf "\rErasing SSD: ${spin:$i:1}"
 	    sleep .1
 	done
+	printf '\r'; printf ' %0.s' {0..42} # 100 expansions of the space character to blank last line
+	echo "${NC}"
     fi
-    echo "${NC}"
 
     wait $hdparm_pid
     if [ $? -eq 0 ]; then
+	echo
 	echo "${BOLD}${CYAN}Erase succeeded.${NC}"
     else
+	echo
 	echo "${BOLD}${RED}Erase failed.${NC}"
     fi
 }
