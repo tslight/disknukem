@@ -17,6 +17,19 @@ BOLD=`tput bold`
 DISKS=$(lsblk -io KNAME,TRAN | grep sata | awk '{print $1}') # kernel name & transfer type
 LOG="/tmp/$(basename $0)-$(date '+%Y-%m-%d').log"
 
+usage () {
+    echo -n "
+$SCRIPTNAME [OPTION]
+
+This script must be run with one of the following options.
+
+Options:
+  -a, --automate	Automate all disk wiping commands with no need for user input
+  -i, --interactive	Query user for each command before running it.
+
+"
+}
+
 # make log more readable
 logentry () {
     echo "" >> "$LOG";
@@ -232,71 +245,116 @@ ssdcheck () {
     fi
 }
 
+powertimer () {
+    poweroff -f -d "$1" > /dev/null 2>&1 &
+    powerpid=$!
+    clear
+
+    echo
+    echo "${BOLD}${CYAN}Wiping complete. Powering off in ${YELLOW}$1${CYAN} seconds. ${NC}"
+    echo
+
+    while :
+    do
+	read -e -n 1 -p "${BOLD}${MAGENTA}Enter c to cancel, q to shutdown now.${NC} " input
+	case "$input" in
+	    [cC])
+		clear
+		kill $powerpid
+		exit 0
+		;;
+	    [qQ])
+		clear
+		kill $powerpid
+		poweroff -f > /dev/null 2>&1 &
+		;;
+	    *)
+		echo
+		echo "${BOLD}${RED}Invalid character.${NP}"
+		echo
+		;;
+	esac
+    done
+}
+
 logentry
 
-for disk in "${DISKS[@]}"; do
-    powercheck
-    echo
-    echo "${BOLD}${CYAN}Found internal drive at /dev/$disk${NC}"
-    echopart "$disk"
-
-    echo
-    if ask "${BOLD}${CYAN}Zap partition table? ${NC}"; then
-	zap "$disk"
-    else
-	echo
-	echo "${BOLD}${MAGENTA}Not zapping partition table.${NC}"
-    fi
-
-    echo
-    if ask "${BOLD}${CYAN}Zero first and last 1MB? ${NC}"; then
-	zero "$disk"
-    else
-	echo
-	echo "${BOLD}${MAGENTA}Not zeroing first and last 1MB.${NC}"
-    fi
-
-    echo
-    if ask "${BOLD}${CYAN}Write 2GB of random data? ${NC}"; then
-	random "$disk"
-    else
-	echo
-	echo "${BOLD}${MAGENTA}Not writing 2GB of random data.${NC}"
-    fi
-
-    echo
-    if ask "${BOLD}${CYAN}Write random data to whole disk? ${NC}"; then
-	nuke "$disk"
-    else
-	echo
-	echo "${BOLD}${MAGENTA}Not nuking disk from orbit!${NC}"
-    fi
-
-    type=$(cat /sys/block/$disk/queue/rotational) # get disk type
-
-    if [ "$type" -eq 0 ]; then
-	echo
-	if ask "${BOLD}${CYAN}SSD detected. Clear memory cells? ${NC}"; then
-	    ssdcheck "$disk"
-	else
+case "$1" in
+    -a|--automate)
+	for disk in "${DISKS[@]}"; do
+	    powercheck
 	    echo
-	    echo "${BOLD}${MAGENTA}Not clearing memory cells.${NC}"
-	fi
-    fi
-    echopart "$disk"
-done
+	    echo "${BOLD}${CYAN}Found internal drive at /dev/$disk${NC}"
+	    zap "$disk"
+	    zero "$disk"
+	    random "$disk"
+	    type=$(cat /sys/block/$disk/queue/rotational)
+	    if [ "$type" -eq 0 ]; then
+		echo
+		echo "${CYAN}${BOLD}SSD detected. Attempting to clear memory cells...${NC}"
+		ssdcheck "$disk"
+	    fi
+	    powertimer 5
+	done
+	;;
+    -i|--interactive)
+	for disk in "${DISKS[@]}"; do
+	    powercheck
+	    echo
+	    echo "${BOLD}${CYAN}Found internal drive at /dev/$disk${NC}"
+	    echopart "$disk"
 
-echo
-if ask "${BOLD}${CYAN}Wiping complete. Shutdown now? ${NC}"; then
-    echo
-    echo "${BOLD}${YELLOW}Shutting down...${NC}"
-    echo
-    clear
-    poweroff
-else
-    echo
-    echo "${BOLD}${YELLOW}Exiting script...${NC}"
-    echo
-    clear
-    exit 0
-fi
+	    echo
+	    if ask "${BOLD}${CYAN}Zap partition table? ${NC}"; then
+		zap "$disk"
+	    else
+		echo
+		echo "${BOLD}${MAGENTA}Not zapping partition table.${NC}"
+	    fi
+
+	    echo
+	    if ask "${BOLD}${CYAN}Zero first and last 1MB? ${NC}"; then
+		zero "$disk"
+	    else
+		echo
+		echo "${BOLD}${MAGENTA}Not zeroing first and last 1MB.${NC}"
+	    fi
+
+	    echo
+	    if ask "${BOLD}${CYAN}Write 2GB of random data? ${NC}"; then
+		random "$disk"
+	    else
+		echo
+		echo "${BOLD}${MAGENTA}Not writing 2GB of random data.${NC}"
+	    fi
+
+	    echo
+	    if ask "${BOLD}${CYAN}Write random data to whole disk? ${NC}"; then
+		nuke "$disk"
+	    else
+		echo
+		echo "${BOLD}${MAGENTA}Not nuking disk from orbit!${NC}"
+	    fi
+
+	    type=$(cat /sys/block/$disk/queue/rotational) # get disk type
+
+	    if [ "$type" -eq 0 ]; then
+		echo
+		if ask "${BOLD}${CYAN}SSD detected. Clear memory cells? ${NC}"; then
+		    ssdcheck "$disk"
+		else
+		    echo
+		    echo "${BOLD}${MAGENTA}Not clearing memory cells.${NC}"
+		fi
+	    fi
+	    echopart "$disk"
+	    powertimer 60
+	done
+	;;
+    -h|--help)
+	usage
+	;;
+    *)
+	usage
+	;;
+esac
