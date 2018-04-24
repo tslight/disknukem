@@ -210,12 +210,26 @@ ssderase () {
     echo "${BOLD}${RED}DO NOT EXIT OR SHUTDOWN UNTIL THIS FINISHES!${NC}"
     hdparm --user-master u --security-set-pass PasSWorD /dev/"$1" >> "$LOG" 2>&1
     hdparm --user-master u --security-"$erasetype" PasSWorD /dev/"$1" >> "$LOG" 2>&1 &
-    wait $!
-    if [ $? -eq 0 ]; then
+    hdparm_pid=$!
+
+    # https://stackoverflow.com/questions/12498304/using-bash-to-display-a-progress-working-indicator
+    if [ "$time" -gt 2 ]; then
+	spin='-\|/'
+	i=0
 	echo
+	while kill -0 $hdparm_pid 2>/dev/null
+	do
+	    i=$(( (i+1) %4 ))
+	    printf "${BOLD}${YELLOW}\rErasing SSD: ${spin:$i:1}"
+	    sleep .1
+	done
+    fi
+    echo "${NC}"
+
+    wait $hdparm_pid
+    if [ $? -eq 0 ]; then
 	echo "${BOLD}${CYAN}Erase succeeded.${NC}"
     else
-	echo
 	echo "${BOLD}${RED}Erase failed.${NC}"
     fi
 }
