@@ -229,10 +229,8 @@ ssderase () {
 
     wait $hdparm_pid
     if [ $? -eq 0 ]; then
-	echo
 	echo "${BOLD}${CYAN}Erase succeeded.${NC}"
     else
-	echo
 	echo "${BOLD}${RED}Erase failed.${NC}"
     fi
 }
