@@ -62,7 +62,7 @@ echopart () {
     echo
     echo "${BOLD}${GREEN}Partition Table:${NC}"
     echo "${BOLD}${GREEN}"
-    echo "DRIVE DETAILS:" >> "$LOG" 2>&1
+    echo "DISK DETAILS:" >> "$LOG" 2>&1
     echo >> "$LOG" 2>&1
     lsblk -o NAME,FSTYPE,LABEL,SIZE /dev/$1 | tee -a "$LOG"
     echo >> "$LOG" 2>&1
@@ -112,10 +112,10 @@ zero () {
     powercheck
     echo
     echo "${BOLD}${YELLOW}Zeroing first and last MB...${NC}"
-    size=$(blockdev --getsz /dev/$1) # size in 512 blocks of drive
-    # zero out first MB of drive
+    size=$(blockdev --getsz /dev/$1) # size in 512 blocks of disk
+    # zero out first MB of disk
     dd if=/dev/zero of=/dev/$1 bs=512 count=2048 >> "$LOG" 2>&1
-    # zero out last MB of drive
+    # zero out last MB of disk
     dd if=/dev/zero of=/dev/$1 bs=512 count=2048 seek=$((size - 2048)) >> "$LOG" 2>&1
 }
 
@@ -159,41 +159,37 @@ support () {
     fi
 }
 
-# Many BIOSes will protect your drives if you have a password set
+# Many BIOSes will protect your disks if you have a password set
 # (security enabled) by issuing a SECURITY FREEZE command before
 # booting an operating system.
 #
-# Only suspend or hotplugging the drive unfreezes the state of the
-# drive. Hotplugging with a bash script is beyond my skillset! ;-)
+# Only suspend or hotplugging the disk unfreezes the state of the
+# disk. Hotplugging with a bash script is beyond my skillset! ;-)
 frozen () {
     if [ $(hdparm -I /dev/$1 | awk '!/not/ && /frozen/') ]; then
 	echo
-	if ask "${BOLD}${CYAN}Drive is frozen. Suspend to unfreeze the drive? ${NC}"; then
-	    rtcwake -m mem -s 3 >> "$LOG" 2>&1 & # automate resume from suspend :-) how cool is that?!
-	    wait $!
-	    if [ $? -ne 0 ]; then
-		echo
-		echo "${BOLD}${RED}Suspend failed.${NC}"
-		return 1
-	    else
-		echo
-		echo "${BOLD}${YELLOW}Suspend worked. Checking disk status...${NC}"
-		if  frozen "$1"; then
-		    return 0;
-		else
-		    echo
-		    echo "${BOLD}${RED}Unfreezing failed.${NC}"
-		    return 1
-		fi
-	    fi
+	echo "${BOLD}${YELLOW}Disk is frozen. Suspending to unfreeze disk...${NC}"
+	sleep 2
+	rtcwake -m mem -s 2 >> "$LOG" 2>&1 & # automate resume from suspend :-) how cool is that?!
+	wait $!
+	if [ $? -ne 0 ]; then
+	    echo
+	    echo "${BOLD}${RED}Suspend failed.${NC}"
+	    return 1
 	else
 	    echo
-	    echo "${BOLD}${RED}Not suspending.${NC}"
-	    return 1
+	    echo "${BOLD}${YELLOW}Suspend worked. Checking disk status...${NC}"
+	    if  frozen "$1"; then
+		return 0;
+	    else
+		echo
+		echo "${BOLD}${RED}Unfreezing failed.${NC}"
+		return 1
+	    fi
 	fi
     else
 	echo
-	echo "${BOLD}${CYAN}Drive not frozen."
+	echo "${BOLD}${CYAN}Disk not frozen."
 	return 0
     fi
 }
@@ -207,28 +203,20 @@ ssderase () {
 	time=$(hdparm -I /dev/"$1" | awk -F. '/SECURITY ERASE/{print $2}' | sed 's/[^0-9]//g')
 	erasetype="erase-enhanced"
     fi
+    powercheck
     echo
-    echo "${BOLD}${MAGENTA}This may take up to $time minutes...${NC}"
+    echo "${BOLD}${YELLOW}This may take up to $time minutes...${NC}"
     echo
-    if ask "${BOLD}${CYAN}Are you sure you want to continue? ${NC}"; then
-	powercheck
+    echo "${BOLD}${RED}DO NOT EXIT OR SHUTDOWN UNTIL THIS FINISHES!${NC}"
+    hdparm --user-master u --security-set-pass PasSWorD /dev/"$1" >> "$LOG" 2>&1
+    hdparm --user-master u --security-"$erasetype" PasSWorD /dev/"$1" >> "$LOG" 2>&1 &
+    wait $!
+    if [ $? -eq 0 ]; then
 	echo
-	echo "${BOLD}${YELLOW}Starting $2 erase...${NC}"
-	echo
-	echo "${BOLD}${RED}DO NOT EXIT OR SHUTDOWN UNTIL THIS FINISHES!${NC}"
-	hdparm --user-master u --security-set-pass PasSWorD /dev/"$1" >> "$LOG" 2>&1
-	hdparm --user-master u --security-"$erasetype" PasSWorD /dev/"$1" >> "$LOG" 2>&1 &
-	wait $!
-	if [ $? -eq 0 ]; then
-	    echo
-	    echo "${BOLD}${CYAN}Erase succeeded.${NC}"
-	else
-	    echo
-	    echo "${BOLD}${RED}Erase failed.${NC}"
-	fi
+	echo "${BOLD}${CYAN}Erase succeeded.${NC}"
     else
 	echo
-	echo "${BOLD}${MAGENTA}Aborting $2 erase.${NC}"
+	echo "${BOLD}${RED}Erase failed.${NC}"
     fi
 }
 
@@ -284,7 +272,7 @@ case "$1" in
 	for disk in "${DISKS[@]}"; do
 	    powercheck
 	    echo
-	    echo "${BOLD}${CYAN}Found internal drive at /dev/$disk${NC}"
+	    echo "${BOLD}${CYAN}Found internal disk at /dev/$disk${NC}"
 	    zap "$disk"
 	    zero "$disk"
 	    random "$disk"
@@ -301,7 +289,7 @@ case "$1" in
 	for disk in "${DISKS[@]}"; do
 	    powercheck
 	    echo
-	    echo "${BOLD}${CYAN}Found internal drive at /dev/$disk${NC}"
+	    echo "${BOLD}${CYAN}Found internal disk at /dev/$disk${NC}"
 	    echopart "$disk"
 
 	    echo
