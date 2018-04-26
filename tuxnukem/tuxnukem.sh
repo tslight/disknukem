@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
 
-readonly NC BOLD BLACK RED GREEN YELLOW BLUE MAGENTA WHITE DISKS LOG
-
 # Define colors to be used when echoing output
-NC=$(tput sgr0)
-BOLD=$(tput bold)
-BLACK=$(tput setaf 0)
-RED=$(tput setaf 1)
-GREEN=$(tput setaf 2)
-YELLOW=$(tput setaf 3)
-BLUE=$(tput setaf 4)
-MAGENTA=$(tput setaf 5)
-CYAN=$(tput setaf 6)
-WHITE=$(tput setaf 7)
+readonly NC=$(tput sgr0)
+readonly BOLD=$(tput bold)
+readonly BLACK=$(tput setaf 0)
+readonly RED=$(tput setaf 1)
+readonly GREEN=$(tput setaf 2)
+readonly YELLOW=$(tput setaf 3)
+readonly BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly CYAN=$(tput setaf 6)
+readonly WHITE=$(tput setaf 7)
 
-DISKS=$(lsblk -io KNAME,TRAN | grep sata | awk '{print $1}') # kernel name & transfer type
-LOG="/tmp/$(basename "$0")-$(date '+%Y-%m-%d').log"
+readonly DISKS=$(lsblk -io KNAME,TRAN | grep sata | awk '{print $1}') # kernel name & transfer type
+readonly LOG="/tmp/$(basename "$0")-$(date '+%Y-%m-%d').log"
 
 usage () {
     echo -n "
-$SCRIPTNAME [OPTION]
+$(basename "$0") [OPTION]
 
 This script must be run with one of the following options.
 
