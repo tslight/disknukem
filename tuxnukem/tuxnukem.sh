@@ -16,7 +16,7 @@ readonly DISKS=$(lsblk -io KNAME,TRAN | grep sata | awk '{print $1}') # kernel n
 readonly LOG="/tmp/$(basename "$0")-$(date '+%Y-%m-%d').log"
 
 usage () {
-    echo -n "
+    echo "
 $(basename "$0") [OPTION]
 
 This script must be run with one of the following options.
@@ -24,7 +24,6 @@ This script must be run with one of the following options.
 Options:
   -a, --automate	Automate all disk wiping commands with no need for user input
   -i, --interactive	Query user for each command before running it.
-
 "
 }
 
@@ -75,8 +74,10 @@ ask () {
 
     while :
     do
-	# -e for readline bindings, -n 1 for execution without return
-	read -e -n 1 -p "$question" ans;
+	# -e for readline bindings
+	# -r to not mangle backslashes
+	# -n 1 for execution without return
+	read -n 1 -rep "$question" ans;
 	case $ans in
 	    [yY]*)
 		return 0
@@ -167,7 +168,7 @@ nuke () {
 support () {
     local disk="$1" type="$2"
 
-    if hdparm -I /dev/"$disk" | egrep -q "not.*supported.*$type.*erase"; then
+    if hdparm -I /dev/"$disk" | grep -Eq "not.*supported.*$type.*erase"; then
 	echo
 	echo "${BOLD}${MAGENTA}Skipping $type erase. Not supported..${NC}"
 	return 1
@@ -185,13 +186,13 @@ support () {
 frozen () {
     local disk="$1"
 
-    if [ "$(hdparm -I /dev/"$disk" | awk '!/not/ && /frozen/')" ]; then
+    if [[ "$(hdparm -I /dev/"$disk" | awk '!/not/ && /frozen/')" ]]; then
 	echo
 	echo "${BOLD}${YELLOW}Disk is frozen. Suspending to unfreeze disk...${NC}"
 	sleep 2
 	rtcwake -m mem -s 2 >> "$LOG" 2>&1 & # automate resume from suspend :-) how cool is that?!
 	wait $!
-	if [ $? -ne 0 ]; then
+	if [[ $? -ne 0 ]]; then
 	    echo
 	    echo "${BOLD}${RED}Suspend failed.${NC}"
 	    return 1
@@ -217,10 +218,10 @@ ssderase () {
     local disk="$1" type="$2" erasestr hdparm_pid spin i
 
     # get time estimate
-    if [ "$type" == "secure" ]; then
+    if [[ "$type" == "secure" ]]; then
 	time=$(hdparm -I /dev/"$disk" | awk -F. '/SECURITY ERASE/{print $1}' | sed 's/[^0-9]//g') # should be possible just with awk...
 	erasestr="erase"
-    elif [ "$type" == "enhanced" ]; then
+    elif [[ "$type" == "enhanced" ]]; then
 	time=$(hdparm -I /dev/"$disk" | awk -F. '/SECURITY ERASE/{print $2}' | sed 's/[^0-9]//g')
 	erasestr="erase-enhanced"
     fi
@@ -237,21 +238,21 @@ ssderase () {
     hdparm_pid=$!
 
     # https://stackoverflow.com/questions/12498304/using-bash-to-display-a-progress-working-indicator
-    if [ "$time" -gt 2 ]; then
+    if [[ "$time" -gt 2 ]]; then
 	spin='-\|/'
 	i=0
 	echo "${BOLD}${YELLOW}"
 	while kill -0 "$hdparm_pid" 2>/dev/null
 	do
 	    i=$(( (i+1) %4 ))
-	    printf "\r%s ${spin:$i:1} " "Erasing SSD:"
+	    printf "\\r%s ${spin:$i:1} " "Erasing SSD:"
 	    sleep .1
 	done
-	printf '\r'; printf ' %0.s' {0..42} # 100 expansions of the space character to blank last line
+	printf '\r'; printf ' %0.s' {0..100} # 100 expansions of the space character to blank last line
     fi
 
     wait "$hdparm_pid"
-    if [ $? -eq 0 ]; then
+    if [[ $? -eq 0 ]]; then
 	echo
 	echo "${BOLD}${CYAN}Erase succeeded.${NC}"
     else
@@ -286,9 +287,8 @@ powertimer () {
     echo "${BOLD}${CYAN}Wiping complete. Powering off in ${YELLOW}$1${CYAN} seconds. ${NC}"
     echo
 
-    while :
-    do
-	read -e -n 1 -p "${BOLD}${MAGENTA}Enter c to cancel, q to shutdown now.${NC} " input
+    while :; do
+	read -n 1 -rep "${BOLD}${MAGENTA}Enter c to cancel, q to shutdown now.${NC} " input
 	case "$input" in
 	    [cC])
 		clear
@@ -322,7 +322,7 @@ main () {
 		zero "$disk"
 		random "$disk"
 		type=$(cat /sys/block/"$disk"/queue/rotational)
-		if [ "$type" -eq 0 ]; then
+		if [[ "$type" -eq 0 ]]; then
 		    echo
 		    echo "${CYAN}${BOLD}SSD detected. Attempting to clear memory cells...${NC}"
 		    ssdcheck "$disk"
@@ -371,7 +371,7 @@ main () {
 
 		type=$(cat /sys/block/"$disk"/queue/rotational) # get disk type
 
-		if [ "$type" -eq 0 ]; then
+		if [[ "$type" -eq 0 ]]; then
 		    echo
 		    if ask "${BOLD}${CYAN}SSD detected. Clear memory cells? ${NC}"; then
 			ssdcheck "$disk"
