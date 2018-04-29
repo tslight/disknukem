@@ -168,7 +168,8 @@ nuke () {
 support () {
     local disk="$1" type="$2"
 
-    if hdparm -I /dev/"$disk" | grep -Eq "not.*supported.*$type.*erase"; then
+    if hdparm -I /dev/"$disk"\
+	    | grep -Eq "not.*supported.*$type.*erase"; then
 	echo
 	echo "${BOLD}${MAGENTA}Skipping $type erase. Not supported..${NC}"
 	return 1
@@ -219,10 +220,14 @@ ssderase () {
 
     # get time estimate
     if [[ "$type" == "secure" ]]; then
-	time=$(hdparm -I /dev/"$disk" | awk -F. '/SECURITY ERASE/{print $1}' | sed 's/[^0-9]//g') # should be possible just with awk...
+	time=$(hdparm -I /dev/"$disk"\
+		   | awk -F. '/SECURITY ERASE/{print $1}'\
+		   | sed 's/[^0-9]//g') # should be possible just with awk...
 	erasestr="erase"
     elif [[ "$type" == "enhanced" ]]; then
-	time=$(hdparm -I /dev/"$disk" | awk -F. '/SECURITY ERASE/{print $2}' | sed 's/[^0-9]//g')
+	time=$(hdparm -I /dev/"$disk"\
+		   | awk -F. '/SECURITY ERASE/{print $2}'\
+		   | sed 's/[^0-9]//g')
 	erasestr="erase-enhanced"
     fi
 
@@ -242,8 +247,7 @@ ssderase () {
 	spin='-\|/'
 	i=0
 	echo "${BOLD}${YELLOW}"
-	while kill -0 "$hdparm_pid" 2>/dev/null
-	do
+	while kill -0 "$hdparm_pid" 2>/dev/null; do
 	    i=$(( (i+1) %4 ))
 	    printf "\\r%s ${spin:$i:1} " "Erasing SSD:"
 	    sleep .1
