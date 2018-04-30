@@ -175,7 +175,7 @@ support () {
 	return 1
     else
 	echo
-	echo "${BOLD}${CYAN}${type^^} erase supported.${NC}"
+	echo "${BOLD}${CYAN}${type^} erase supported.${NC}"
 	return 0
     fi
 }
@@ -236,7 +236,7 @@ ssderase () {
     powercheck
 
     echo
-    echo "${BOLD}${YELLOW}Started ${type^^} erase. This may take up to $time minutes...${NC}"
+    echo "${BOLD}${YELLOW}Started ${type^} erase. This may take up to $time minutes...${NC}"
     echo
     echo "${BOLD}${RED}DO NOT EXIT OR SHUTDOWN UNTIL THIS FINISHES!${NC}"
 
