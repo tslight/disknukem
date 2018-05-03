@@ -12,7 +12,8 @@ readonly MAGENTA=$(tput setaf 5)
 readonly CYAN=$(tput setaf 6)
 readonly WHITE=$(tput setaf 7)
 
-readonly DISKS=$(lsblk -io KNAME,TRAN | grep sata | awk '{print $1}') # kernel name & transfer type
+# kernel name & transfer type, skip dvd drives (sr0)
+readonly DISKS=($(lsblk -io KNAME,TRAN | awk '/sata/ && !/sr0/ {print $1}'))
 readonly LOG="/tmp/$(basename "$0")-$(date '+%Y-%m-%d').log"
 
 usage () {
