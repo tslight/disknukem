@@ -283,12 +283,27 @@ ssdcheck () {
     fi
 }
 
+getssd () {
+    local disk="$1"
+    local -i ans
+
+    ans=$(cat /sys/block/"$disk"/queue/rotational)
+
+    if ((ans = 0)); then
+	echo
+	echo "${CYAN}${BOLD}SSD detected. Attempting to clear memory cells...${NC}"
+	ssdcheck "$disk"
+    else
+	echo
+	echo "${CYAN}${BOLD}No SSD detected. Nothing more to do.${NC}"
+    fi
+}
+
 powertimer () {
     local time="$1" powerpid input
 
     poweroff -f -d "$time" > /dev/null 2>&1 &
     powerpid=$!
-    clear
 
     echo
     echo "${BOLD}${CYAN}Wiping complete. Powering off in ${YELLOW}$1${CYAN} seconds. ${NC}"
@@ -316,6 +331,7 @@ powertimer () {
     done
 }
 
+
 main () {
     local arg="$1"
 
@@ -328,12 +344,7 @@ main () {
 		zap "$disk"
 		zero "$disk"
 		random "$disk"
-		type=$(cat /sys/block/"$disk"/queue/rotational)
-		if [[ "$type" -eq 0 ]]; then
-		    echo
-		    echo "${CYAN}${BOLD}SSD detected. Attempting to clear memory cells...${NC}"
-		    ssdcheck "$disk"
-		fi
+		getssd "$disk"
 		powertimer 5
 	    done
 	    ;;
@@ -376,17 +387,7 @@ main () {
 		    echo "${BOLD}${MAGENTA}Not nuking disk from orbit!${NC}"
 		fi
 
-		type=$(cat /sys/block/"$disk"/queue/rotational) # get disk type
-
-		if [[ "$type" -eq 0 ]]; then
-		    echo
-		    if ask "${BOLD}${CYAN}SSD detected. Clear memory cells? ${NC}"; then
-			ssdcheck "$disk"
-		    else
-			echo
-			echo "${BOLD}${MAGENTA}Not clearing memory cells.${NC}"
-		    fi
-		fi
+		getssd "$disk"
 		echopart "$disk"
 		powertimer 60
 	    done
