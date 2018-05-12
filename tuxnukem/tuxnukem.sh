@@ -40,18 +40,20 @@ logentry () {
 # query power adapter presence. use wildcard as different adapters have
 # different names...
 powercheck () {
-    until grep -q on-line /proc/acpi/ac_adapter/*/state; do
-	echo -ne "${BOLD}${RED}NO AC ADAPTER DETECTED. CONNECT TO AC TO CONTINUE....${NC}"\\r
-    done
-    # I'm pretty sure it's not possible to ctrl-c out of the loop (but not the
-    # script) without adding a trap, but better safe than sorry!
-    if grep -q on-line /proc/acpi/ac_adapter/*/state; then
-	return 0
-    else
-	echo
-	echo "${BOLD}${RED}YOU SNEAKY BUGGER! ABORTING.${NC}"
-	echo
-	exit 1
+    if [[ -d "/proc/acpi/ac_adapter" ]]; then
+	until grep -q on-line /proc/acpi/ac_adapter/*/state; do
+	    echo -ne "${BOLD}${RED}NO AC ADAPTER DETECTED. CONNECT TO AC TO CONTINUE....${NC}"\\r
+	done
+	# I'm pretty sure it's not possible to ctrl-c out of the loop (but not the
+	# script) without adding a trap, but better safe than sorry!
+	if grep -q on-line /proc/acpi/ac_adapter/*/state; then
+	    return 0
+	else
+	    echo
+	    echo "${BOLD}${RED}YOU SNEAKY BUGGER! ABORTING.${NC}"
+	    echo
+	    exit 1
+	fi
     fi
 }
 
