@@ -364,24 +364,10 @@ main () {
 	    for disk in "${DISKS[@]}"; do
 		powercheck
 		echopart "$disk"
-
 		echo
-		if ask "${BOLD}${CYAN}Nuke /dev/$disk from orbit?! ${NC}"; then
-		    echo
-		    if ask "${BOLD}${CYAN}Zap partition table? ${NC}"; then
-			zap "$disk"
-		    else
-			echo
-			echo "${BOLD}${MAGENTA}Not zapping partition table.${NC}"
-		    fi
-
-		    echo
-		    if ask "${BOLD}${CYAN}Zero first and last 1MB? ${NC}"; then
-			zero "$disk"
-		    else
-			echo
-			echo "${BOLD}${MAGENTA}Not zeroing first and last 1MB.${NC}"
-		    fi
+		if ask "${BOLD}${CYAN}Nuke ${YELLOW}/dev/$disk${CYAN} from orbit?! ${NC}"; then
+		    zap "$disk"
+		    zero "$disk"
 
 		    echo
 		    if ask "${BOLD}${CYAN}Write 2GB of random data? ${NC}"; then
@@ -402,7 +388,7 @@ main () {
 		    echopart "$disk"
 		else
 		    echo
-		    echo "${BOLD}${MAGENTA}Not nuking /dev/$disk from orbit!${NC}"
+		    echo "${BOLD}${MAGENTA}Not nuking ${YELLOW}/dev/$disk${MAGENTA} from orbit!${NC}"
 		fi
 	    done
 	    powertimer 60
