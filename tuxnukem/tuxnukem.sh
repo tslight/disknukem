@@ -334,7 +334,7 @@ main () {
     local arg="$1"
 
     echo
-    echo -n "${BOLD}${GREEN}SATA DISKS${MAGENTA} = ${NC}"
+    echo -n "${BOLD}${GREEN}Found internal disks${MAGENTA} @ ${NC}"
     for disk in "${DISKS[@]}"; do
 	if [[ "$disk" == "${DISKS[-1]}" ]]; then
 	    echo "${BOLD}${YELLOW}/dev/$disk${NC}"
@@ -348,55 +348,60 @@ main () {
 	    for disk in "${DISKS[@]}"; do
 		powercheck
 		echo
-		echo "${BOLD}${CYAN}Found internal disk at /dev/$disk${NC}"
+		echo "${BOLD}${CYAN}Nuking /dev/$disk from orbit!${NC}"
 		zap "$disk"
 		zero "$disk"
 		random "$disk"
 		getssd "$disk"
 	    done
-	    powertimer 8
+	    powertimer 10
 	    ;;
 	-i|--interactive)
 	    for disk in "${DISKS[@]}"; do
 		powercheck
 		echo
-		echo "${BOLD}${CYAN}Found internal disk at /dev/$disk${NC}"
+		echo "${BOLD}${CYAN}Partition Table of /dev/${disk}: ${NC}"
 		echopart "$disk"
 
 		echo
-		if ask "${BOLD}${CYAN}Zap partition table? ${NC}"; then
-		    zap "$disk"
-		else
+		if ask "${BOLD}${CYAN}Nuke /dev/$disk from orbit?! ${NC}"; then
 		    echo
-		    echo "${BOLD}${MAGENTA}Not zapping partition table.${NC}"
-		fi
+		    if ask "${BOLD}${CYAN}Zap partition table? ${NC}"; then
+			zap "$disk"
+		    else
+			echo
+			echo "${BOLD}${MAGENTA}Not zapping partition table.${NC}"
+		    fi
 
-		echo
-		if ask "${BOLD}${CYAN}Zero first and last 1MB? ${NC}"; then
-		    zero "$disk"
-		else
 		    echo
-		    echo "${BOLD}${MAGENTA}Not zeroing first and last 1MB.${NC}"
-		fi
+		    if ask "${BOLD}${CYAN}Zero first and last 1MB? ${NC}"; then
+			zero "$disk"
+		    else
+			echo
+			echo "${BOLD}${MAGENTA}Not zeroing first and last 1MB.${NC}"
+		    fi
 
-		echo
-		if ask "${BOLD}${CYAN}Write 2GB of random data? ${NC}"; then
-		    random "$disk"
-		else
 		    echo
-		    echo "${BOLD}${MAGENTA}Not writing 2GB of random data.${NC}"
-		fi
+		    if ask "${BOLD}${CYAN}Write 2GB of random data? ${NC}"; then
+			random "$disk"
+		    else
+			echo
+			echo "${BOLD}${MAGENTA}Not writing 2GB of random data.${NC}"
+		    fi
 
-		echo
-		if ask "${BOLD}${CYAN}Write random data to whole disk? ${NC}"; then
-		    nuke "$disk"
+		    echo
+		    if ask "${BOLD}${CYAN}Write random data to whole disk? ${NC}"; then
+			nuke "$disk"
+		    else
+			echo
+			echo "${BOLD}${MAGENTA}Not writing random data to whole disk.${NC}"
+		    fi
+		    getssd "$disk"
+		    echopart "$disk"
 		else
 		    echo
 		    echo "${BOLD}${MAGENTA}Not nuking disk from orbit!${NC}"
 		fi
-
-		getssd "$disk"
-		echopart "$disk"
 	    done
 	    powertimer 60
 	    ;;
