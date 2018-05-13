@@ -62,7 +62,7 @@ echopart () {
     local disk="$1"
 
     echo
-    echo "${BOLD}${GREEN}Partition Table:${NC}"
+    echo "${BOLD}${GREEN}Partition Table of ${YELLOW}/dev/${disk}${MAGENTA}:${NC}"
     echo "${BOLD}${GREEN}"
     echo "DISK DETAILS:" >> "$LOG" 2>&1
     echo >> "$LOG" 2>&1
@@ -359,8 +359,6 @@ main () {
 	-i|--interactive)
 	    for disk in "${DISKS[@]}"; do
 		powercheck
-		echo
-		echo "${BOLD}${CYAN}Partition Table of /dev/${disk}: ${NC}"
 		echopart "$disk"
 
 		echo
