@@ -61,6 +61,8 @@ powercheck () {
 echopart () {
     local disk="$1"
 
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
     echo
     echo "${BOLD}${GREEN}Partition Table of ${YELLOW}/dev/${disk}${MAGENTA}:${NC}"
     echo "${BOLD}${GREEN}"
@@ -110,6 +112,8 @@ zap () {
     echo "${BOLD}${YELLOW}Zapping partition table...${NC}"
 
     sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
     sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1 # ocd!
 }
 
