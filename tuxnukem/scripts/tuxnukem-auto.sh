@@ -2,4 +2,4 @@
 
 dir=$(dirname $0)
 parent=${dir%/*}
-bash "$parent"/tuxnukem.sh -a
+bash "$parent"/tuxnukem --automate
