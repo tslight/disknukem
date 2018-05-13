@@ -81,13 +81,13 @@ ask () {
 	# -n 1 for execution without return
 	read -n 1 -rep "$question" ans;
 	case $ans in
-	    [yY]*)
+	    y|Y)
 		return 0
 		;;
-	    [nN]*)
+	    n|N)
 		return 1
 		;;
-	    [qQ]*)
+	    q|Q)
 		clear
 		exit 0
 		;;
@@ -170,6 +170,9 @@ nuke () {
 	echo "${BOLD}${GREEN}"
 	# urandom faster but less cryptographically secure
 	dcfldd if=/dev/urandom of=/dev/"$disk" bs=4M
+	sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1
+	partprobe /dev/"$disk" >> "$LOG" 2>&1
+	kpartx -u /dev/"$disk" >> "$LOG" 2>&1
 	echo -n "${NC}"
     else
 	echo
@@ -322,14 +325,14 @@ powertimer () {
     echo
 
     while :; do
-	read -n 1 -rep "${BOLD}${MAGENTA}Enter c to cancel, q to shutdown now.${NC} " input
+	read -n 1 -rep "${BOLD}${MAGENTA}Enter ${YELLOW}(c)${MAGENTA}ancel to continue booting, or ${YELLOW}(q)${MAGENTA}uit to shutdown now.${NC} " input
 	case "$input" in
-	    [cC])
+	    c|C)
 		clear
 		kill "$powerpid"
 		exit 0
 		;;
-	    [qQ])
+	    q|Q)
 		clear
 		kill "$powerpid"
 		poweroff -f > /dev/null 2>&1 &
