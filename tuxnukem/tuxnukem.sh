@@ -75,8 +75,7 @@ echopart () {
 ask () {
     local question="$1"
 
-    while :
-    do
+    while :; do
 	# -e for readline bindings
 	# -r to not mangle backslashes
 	# -n 1 for execution without return
@@ -84,22 +83,20 @@ ask () {
 	case $ans in
 	    [yY]*)
 		return 0
-		break
 		;;
 	    [nN]*)
 		return 1
-		break
 		;;
 	    [qQ]*)
-		exit 1
-		break
+		clear
+		exit 0
 		;;
 	    *)
 		echo
-		echo "${BOLD}${RED}Enter y or n, q to quit.${NC}";
+		echo "${BOLD}${RED}Enter (y)es, (n)o or (q)uit.${NC}";
 		echo
 		;;
-	esac;
+	esac
     done
 }
 
@@ -291,7 +288,7 @@ getssd () {
 
     ans=$(cat /sys/block/"$disk"/queue/rotational)
 
-    if ((ans = 0)); then
+    if ((ans == 0)); then
 	echo
 	echo "${CYAN}${BOLD}SSD detected. Attempting to clear memory cells...${NC}"
 	ssdcheck "$disk"
@@ -333,9 +330,18 @@ powertimer () {
     done
 }
 
-
 main () {
     local arg="$1"
+
+    echo
+    echo -n "${BOLD}${GREEN}SATA DISKS${MAGENTA} = ${NC}"
+    for disk in "${DISKS[@]}"; do
+	if [[ "$disk" == "${DISKS[-1]}" ]]; then
+	    echo "${BOLD}${YELLOW}/dev/$disk${NC}"
+	else
+	    echo -n "${BOLD}${YELLOW}/dev/$disk${MAGENTA}, "
+	fi
+    done
 
     case "$arg" in
 	-a|--automate)
@@ -347,8 +353,8 @@ main () {
 		zero "$disk"
 		random "$disk"
 		getssd "$disk"
-		powertimer 5
 	    done
+	    powertimer 8
 	    ;;
 	-i|--interactive)
 	    for disk in "${DISKS[@]}"; do
@@ -391,8 +397,8 @@ main () {
 
 		getssd "$disk"
 		echopart "$disk"
-		powertimer 60
 	    done
+	    powertimer 60
 	    ;;
 	-h|--help)
 	    usage
