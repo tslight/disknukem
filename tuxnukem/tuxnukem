@@ -398,7 +398,7 @@ main () {
 		    echopart "$disk"
 		else
 		    echo
-		    echo "${BOLD}${MAGENTA}Not nuking disk from orbit!${NC}"
+		    echo "${BOLD}${MAGENTA}Not nuking /dev/$disk from orbit!${NC}"
 		fi
 	    done
 	    powertimer 60
