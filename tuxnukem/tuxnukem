@@ -325,7 +325,7 @@ powertimer () {
     echo
 
     while :; do
-	read -n 1 -rep "${BOLD}${MAGENTA}Enter ${YELLOW}(c)${MAGENTA}ancel to continue booting, or ${YELLOW}(q)${MAGENTA}uit to shutdown now.${NC} " input
+	read -n 1 -rep "${BOLD}${MAGENTA}Enter ${YELLOW}(c)${MAGENTA}ancel to continue booting, or ${YELLOW}(q)${MAGENTA}uit to shutdown now.${NC}: " input
 	case "$input" in
 	    c|C)
 		clear
