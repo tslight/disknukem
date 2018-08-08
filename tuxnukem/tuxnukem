@@ -49,7 +49,6 @@ powercheck () {
 	if grep -q on-line /proc/acpi/ac_adapter/*/state; then
 	    return 0
 	else
-	    echo
 	    echo "${BOLD}${RED}YOU SNEAKY BUGGER! ABORTING.${NC}"
 	    echo
 	    exit 1
@@ -233,6 +232,39 @@ frozen () {
     fi
 }
 
+nvmerase () {
+    local disk="$1"
+
+    nvme format /dev/"$disk" >> "$LOG" 2>&1
+    if [[ $? -eq 0 ]]; then
+	echo
+	echo "${BOLD}${CYAN}NVME Erase succeeded on /dev/$disk.${NC}"
+    else
+	echo
+	echo "${BOLD}${RED}NVME Format not supported on /dev/$disk.${NC}"
+    fi
+
+    nvme format --ses=1 /dev/"$disk" >> "$LOG" 2>&1
+    if [[ $? -eq 0 ]]; then
+	echo
+	echo "${BOLD}${CYAN}NVME User Data Erase succeeded on /dev/$disk.${NC}"
+    else
+	echo
+	echo "${BOLD}${RED}NVME User Data Erase Not supported on /dev/$disk.${NC}"
+    fi
+
+    nvme format --ses=2 /dev/"$disk" >> "$LOG" 2>&1
+    if [[ $? -eq 0 ]]; then
+	echo
+	echo "${BOLD}${CYAN}NVME Cryptographic Erase succeeded on /dev/$disk.${NC}"
+    else
+	echo
+	echo "${BOLD}${RED}NVME Cryptographic Erase not supported on /dev/$disk.${NC}"
+    fi
+
+    return
+}
+
 ssderase () {
     local disk="$1" type="$2" erasestr hdparm_pid spin i
 
@@ -261,7 +293,7 @@ ssderase () {
     hdparm_pid=$!
 
     # https://stackoverflow.com/questions/12498304/using-bash-to-display-a-progress-working-indicator
-    if [[ "$time" -gt 2 ]]; then
+    if [[ "$time" -gt 1 ]]; then
 	spin='-\|/'
 	i=0
 	echo "${BOLD}${YELLOW}"
@@ -284,11 +316,19 @@ ssderase () {
 ssdcheck () {
     local disk="$1"
 
+    if [[ "$disk" =~ nvme ]]; then
+	echo
+	echo "${BOLD}${MAGENTA}NVME device detected.${NC}"
+	nvmerase "$disk"
+	return
+    fi
+
     if support "$disk" "secure"; then
 	if frozen "$disk"; then
 	    ssderase "$disk" "secure"
 	fi
     fi
+
     if support "$disk" "enhanced"; then
 	if frozen "$disk"; then
 	    ssderase "$disk" "enhanced"
