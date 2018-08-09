@@ -13,7 +13,7 @@ readonly CYAN=$(tput setaf 6)
 readonly WHITE=$(tput setaf 7)
 
 # kernel name & transfer type, skip dvd drives (sr0)
-readonly DISKS=($(lsblk -io KNAME,TRAN | awk '/sata/ || /nvme/ && !/sr0/ {print $1}'))
+readonly DISKS=($(lsblk -io KNAME,TRAN,TYPE | awk '/sata|nvme/ && /disk/ && !/sr0/ {print $1}'))
 readonly LOG="/tmp/$(basename "$0")-$(date '+%Y-%m-%d').log"
 
 usage () {
