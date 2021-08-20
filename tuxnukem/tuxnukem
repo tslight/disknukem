@@ -1,0 +1,457 @@
+#!/usr/bin/env bash
+
+# Define colors to be used when echoing output
+readonly NC=$(tput sgr0)
+readonly BOLD=$(tput bold)
+readonly BLACK=$(tput setaf 0)
+readonly RED=$(tput setaf 1)
+readonly GREEN=$(tput setaf 2)
+readonly YELLOW=$(tput setaf 3)
+readonly BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly CYAN=$(tput setaf 6)
+readonly WHITE=$(tput setaf 7)
+
+# kernel name & transfer type, skip dvd drives (sr0)
+readonly DISKS=($(lsblk -io KNAME,TRAN,TYPE | awk '/sata|nvme/ && /disk/ && !/sr0/ {print $1}'))
+readonly LOG="/tmp/$(basename "$0")-$(date '+%Y-%m-%d').log"
+
+usage () {
+    echo "
+$(basename "$0") [OPTION]
+
+This script must be run with one of the following options.
+
+Options:
+  -a, --automate	Automate all disk wiping commands with no need for user input
+  -i, --interactive	Query user for each command before running it.
+"
+}
+
+# make log more readable
+logentry () {
+    echo >> "$LOG";
+    echo "DATE: $(date '+%A %d %B %Y')" >> "$LOG";
+    echo "TIME: $(date '+%H:%M:%S')" >> "$LOG";
+    echo "OUTPUT FROM DISK_NUKEM.SH EXECUTION:" >> "$LOG"
+    echo >> "$LOG";
+}
+
+# query power adapter presence. use wildcard as different adapters have
+# different names...
+powercheck () {
+    if [[ -d "/proc/acpi/ac_adapter" ]]; then
+	until grep -q on-line /proc/acpi/ac_adapter/*/state; do
+	    echo -ne "${BOLD}${RED}NO AC ADAPTER DETECTED. CONNECT TO AC TO CONTINUE....${NC}"\\r
+	done
+	# I'm pretty sure it's not possible to ctrl-c out of the loop (but not the
+	# script) without adding a trap, but better safe than sorry!
+	if grep -q on-line /proc/acpi/ac_adapter/*/state; then
+	    return 0
+	else
+	    echo "${BOLD}${RED}YOU SNEAKY BUGGER! ABORTING.${NC}"
+	    echo
+	    exit 1
+	fi
+    fi
+}
+
+# give before an after feedback on state of disk
+echopart () {
+    local disk="$1"
+
+    echo
+    echo "${BOLD}${GREEN}Partition Table of ${YELLOW}/dev/${disk}${MAGENTA}:${NC}"
+    echo "${BOLD}${GREEN}"
+    echo "DISK DETAILS:" >> "$LOG" 2>&1
+    echo >> "$LOG" 2>&1
+    lsblk -o NAME,FSTYPE,LABEL,SIZE /dev/"$disk" | tee -a "$LOG"
+    echo >> "$LOG" 2>&1
+    echo -n "${NC}"
+}
+
+# infinite loop to get simple user input
+ask () {
+    local question="$1"
+
+    while :; do
+	# -e for readline bindings
+	# -r to not mangle backslashes
+	# -n 1 for execution without return
+	read -n 1 -rep "$question" ans;
+	case $ans in
+	    y|Y)
+		return 0
+		;;
+	    n|N)
+		return 1
+		;;
+	    q|Q)
+		clear
+		exit 0
+		;;
+	    *)
+		echo
+		echo "${BOLD}${RED}Enter (y)es, (n)o or (q)uit.${NC}";
+		echo
+		;;
+	esac
+    done
+}
+
+# sgdisk wrapper to destroy partition table data structures
+zap () {
+    local disk="$1"
+
+    powercheck
+
+    echo
+    echo "${BOLD}${YELLOW}Zapping partition table...${NC}"
+
+    sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
+    sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1 # ocd!
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
+}
+
+zero () {
+    local disk="$1"
+
+    powercheck
+
+    echo
+    echo "${BOLD}${YELLOW}Zeroing first and last MB...${NC}"
+
+    size=$(blockdev --getsz /dev/"$disk") # size in 512 blocks of disk
+    # zero out first MB of disk
+    dd if=/dev/zero of=/dev/"$disk" bs=512 count=2048 >> "$LOG" 2>&1
+    # zero out last MB of disk
+    dd if=/dev/zero of=/dev/"$disk" bs=512 count=2048 seek=$((size - 2048)) >> "$LOG" 2>&1
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
+    sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1 # ocd!
+    sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
+}
+
+# use dcfldd as it provides nice progress feedback unlike dd
+random () {
+    local disk="$1"
+
+    powercheck
+
+    echo
+    echo "${BOLD}${YELLOW}Writing 2GB of random data...${NC}"
+
+    echo "${BOLD}${GREEN}"
+    # urandom faster but less cryptographically secure
+    dcfldd if=/dev/urandom of=/dev/"$disk" bs=1M count=2048
+    sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1
+    partprobe /dev/"$disk" >> "$LOG" 2>&1
+    kpartx -u /dev/"$disk" >> "$LOG" 2>&1
+    echo -n "${NC}"
+}
+
+nuke () {
+    local disk="$1"
+
+    powercheck
+
+    echo
+    echo "${BOLD}${MAGENTA}This will take a really long time...${NC}"
+    echo
+    if ask "${BOLD}${CYAN}Are you sure you want to continue? ${NC}"; then
+	echo
+	echo "${BOLD}${YELLOW}Nuking disk...${NC}"
+	echo "${BOLD}${GREEN}"
+	# urandom faster but less cryptographically secure
+	dcfldd if=/dev/urandom of=/dev/"$disk" bs=4M
+	sgdisk --zap-all /dev/"$disk" >> "$LOG" 2>&1
+	partprobe /dev/"$disk" >> "$LOG" 2>&1
+	kpartx -u /dev/"$disk" >> "$LOG" 2>&1
+	echo -n "${NC}"
+    else
+	echo
+	echo "${BOLD}${MAGENTA}Aborting disk nuke.${NC}"
+    fi
+}
+
+# check if type of erase is supported.
+support () {
+    local disk="$1" type="$2"
+
+    if hdparm -I /dev/"$disk"\
+	    | grep -Eq "not.*supported.*$type.*erase"; then
+	echo
+	echo "${BOLD}${MAGENTA}Skipping $type erase. Not supported..${NC}"
+	return 1
+    else
+	echo
+	echo "${BOLD}${CYAN}${type^} erase supported.${NC}"
+	return 0
+    fi
+}
+
+# Many BIOSes will protect your disks if you have a password set (security
+# enabled) by issuing a SECURITY FREEZE command before booting an operating
+# system.
+#
+# Only suspend or hotplugging the disk unfreezes the state of the
+# disk. Hotplugging with a bash script is beyond my skillset! ;-)
+frozen () {
+    local disk="$1"
+
+    if [[ "$(hdparm -I /dev/"$disk" | awk '!/not/ && /frozen/')" ]]; then
+	echo
+	echo "${BOLD}${YELLOW}Disk is frozen. Suspending to unfreeze disk...${NC}"
+	sleep 2
+	rtcwake -m mem -s 2 >> "$LOG" 2>&1 & # automate resume from suspend :-) how cool is that?!
+	wait $!
+	if [[ $? -ne 0 ]]; then
+	    echo
+	    echo "${BOLD}${RED}Suspend failed.${NC}"
+	    return 1
+	else
+	    echo
+	    echo "${BOLD}${YELLOW}Suspend worked. Checking disk status...${NC}"
+	    if  frozen "$disk"; then
+		return 0;
+	    else
+		echo
+		echo "${BOLD}${RED}Unfreezing failed.${NC}"
+		return 1
+	    fi
+	fi
+    else
+	echo
+	echo "${BOLD}${CYAN}Disk not frozen."
+	return 0
+    fi
+}
+
+nvmerase () {
+    local disk="$1"
+
+    nvme format /dev/"$disk" >> "$LOG" 2>&1
+    if [[ $? -eq 0 ]]; then
+	echo
+	echo "${BOLD}${CYAN}NVME Erase succeeded on /dev/$disk.${NC}"
+    else
+	echo
+	echo "${BOLD}${RED}NVME Format not supported on /dev/$disk.${NC}"
+    fi
+
+    nvme format --ses=1 /dev/"$disk" >> "$LOG" 2>&1
+    if [[ $? -eq 0 ]]; then
+	echo
+	echo "${BOLD}${CYAN}NVME User Data Erase succeeded on /dev/$disk.${NC}"
+    else
+	echo
+	echo "${BOLD}${RED}NVME User Data Erase Not supported on /dev/$disk.${NC}"
+    fi
+
+    nvme format --ses=2 /dev/"$disk" >> "$LOG" 2>&1
+    if [[ $? -eq 0 ]]; then
+	echo
+	echo "${BOLD}${CYAN}NVME Cryptographic Erase succeeded on /dev/$disk.${NC}"
+    else
+	echo
+	echo "${BOLD}${RED}NVME Cryptographic Erase not supported on /dev/$disk.${NC}"
+    fi
+
+    return
+}
+
+ssderase () {
+    local disk="$1" type="$2" erasestr hdparm_pid spin i
+
+    # get time estimate
+    if [[ "$type" == "secure" ]]; then
+	time=$(hdparm -I /dev/"$disk"\
+		   | awk -F. '/SECURITY ERASE/{print $1}'\
+		   | sed 's/[^0-9]//g') # should be possible just with awk...
+	erasestr="erase"
+    elif [[ "$type" == "enhanced" ]]; then
+	time=$(hdparm -I /dev/"$disk"\
+		   | awk -F. '/SECURITY ERASE/{print $2}'\
+		   | sed 's/[^0-9]//g')
+	erasestr="erase-enhanced"
+    fi
+
+    powercheck
+
+    echo
+    echo "${BOLD}${YELLOW}Started ${type^} erase. This may take up to $time minutes...${NC}"
+    echo
+    echo "${BOLD}${RED}DO NOT EXIT OR SHUTDOWN UNTIL THIS FINISHES!${NC}"
+
+    hdparm --user-master u --security-set-pass PasSWorD /dev/"$disk" >> "$LOG" 2>&1
+    hdparm --user-master u --security-"$erasestr" PasSWorD /dev/"$disk" >> "$LOG" 2>&1 &
+    hdparm_pid=$!
+
+    # https://stackoverflow.com/questions/12498304/using-bash-to-display-a-progress-working-indicator
+    if [[ "$time" -gt 1 ]]; then
+	spin='-\|/'
+	i=0
+	echo "${BOLD}${YELLOW}"
+	while kill -0 "$hdparm_pid" 2>/dev/null; do
+	    i=$(( (i+1) %4 ))
+	    printf "\\r%s ${spin:$i:1} " "Erasing SSD:"
+	    sleep .1
+	done
+	printf "\\r"; printf " %0.s" {0..100} # 100 expansions of the space character to blank last line
+    fi
+
+    wait "$hdparm_pid"
+    if [[ $? -eq 0 ]]; then
+	echo $'\r'"${BOLD}${CYAN}Erase succeeded.${NC}"
+    else
+	echo $'\r'"${BOLD}${RED}Erase failed.${NC}"
+    fi
+}
+
+ssdcheck () {
+    local disk="$1"
+
+    if [[ "$disk" =~ nvme ]]; then
+	echo
+	echo "${BOLD}${MAGENTA}NVME device detected.${NC}"
+	nvmerase "$disk"
+	return
+    fi
+
+    if support "$disk" "secure"; then
+	if frozen "$disk"; then
+	    ssderase "$disk" "secure"
+	fi
+    fi
+
+    if support "$disk" "enhanced"; then
+	if frozen "$disk"; then
+	    ssderase "$disk" "enhanced"
+	fi
+    fi
+}
+
+getssd () {
+    local disk="$1"
+    local -i ans
+
+    ans=$(cat /sys/block/"$disk"/queue/rotational)
+
+    if ((ans == 0)); then
+	echo
+	echo "${CYAN}${BOLD}SSD detected. Attempting to clear memory cells...${NC}"
+	ssdcheck "$disk"
+    else
+	echo
+	echo "${CYAN}${BOLD}No SSD detected. Nothing more to do.${NC}"
+    fi
+}
+
+powertimer () {
+    local time="$1" powerpid input
+
+    poweroff -f -d "$time" > /dev/null 2>&1 &
+    powerpid=$!
+
+    echo
+    echo "${BOLD}${CYAN}Wiping complete. Powering off in ${YELLOW}$1${CYAN} seconds. ${NC}"
+    echo
+
+    while :; do
+	read -n 1 -rep "${BOLD}${MAGENTA}Enter ${YELLOW}(c)${MAGENTA}ancel to continue booting, or ${YELLOW}(q)${MAGENTA}uit to shutdown now.${NC}: " input
+	case "$input" in
+	    c|C)
+		clear
+		kill "$powerpid"
+		exit 0
+		;;
+	    q|Q)
+		clear
+		kill "$powerpid"
+		poweroff -f > /dev/null 2>&1 &
+		;;
+	    *)
+		echo
+		echo "${BOLD}${RED}Invalid character.${NP}"
+		echo
+		;;
+	esac
+    done
+}
+
+main () {
+    local arg="$1"
+
+    echo
+    echo -n "${BOLD}${GREEN}Found internal disks${MAGENTA} @ ${NC}"
+    for disk in "${DISKS[@]}"; do
+	if [[ "$disk" == "${DISKS[-1]}" ]]; then
+	    echo "${BOLD}${YELLOW}/dev/$disk${NC}"
+	else
+	    echo -n "${BOLD}${YELLOW}/dev/$disk${MAGENTA}, "
+	fi
+    done
+
+    case "$arg" in
+	-a|--automate)
+	    for disk in "${DISKS[@]}"; do
+		powercheck
+		echo
+		echo "${BOLD}${CYAN}Nuking /dev/$disk from orbit!${NC}"
+		zap "$disk"
+		zero "$disk"
+		random "$disk"
+		getssd "$disk"
+	    done
+	    powertimer 10
+	    ;;
+	-i|--interactive)
+	    for disk in "${DISKS[@]}"; do
+		powercheck
+		echopart "$disk"
+		echo
+		if ask "${BOLD}${CYAN}Nuke ${YELLOW}/dev/$disk${CYAN} from orbit?! ${NC}"; then
+		    zap "$disk"
+		    zero "$disk"
+
+		    echo
+		    if ask "${BOLD}${CYAN}Write 2GB of random data? ${NC}"; then
+			random "$disk"
+		    else
+			echo
+			echo "${BOLD}${MAGENTA}Not writing 2GB of random data.${NC}"
+		    fi
+
+		    echo
+		    if ask "${BOLD}${CYAN}Write random data to whole disk? ${NC}"; then
+			nuke "$disk"
+		    else
+			echo
+			echo "${BOLD}${MAGENTA}Not writing random data to whole disk.${NC}"
+		    fi
+		    getssd "$disk"
+		    echopart "$disk"
+		else
+		    echo
+		    echo "${BOLD}${MAGENTA}Not nuking ${YELLOW}/dev/$disk${MAGENTA} from orbit!${NC}"
+		fi
+	    done
+	    powertimer 60
+	    ;;
+	-h|--help)
+	    usage
+	    ;;
+	*)
+	    usage
+	    ;;
+    esac
+}
+
+clear
+logentry
+main "$1"
